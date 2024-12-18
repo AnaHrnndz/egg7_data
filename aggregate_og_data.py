@@ -148,7 +148,16 @@ class OGPreprocessor:
             pfam_top_term = self.calculate_top_terms(seq_ids, "pfam_arc")
             smart_top_term = self.calculate_top_terms(seq_ids, "smart_arc")
   
-            
+            if og["Inparalogs_Rate"] == '-':
+                in_rate = '-'
+            else: 
+                in_rate = float(og["Inparalogs_Rate"])
+
+            if og["SP_overlap_dup"] == '-':
+                so_ovlap = '-'
+            else:
+                so_ovlap = float(og["SP_overlap_dup"])
+
             og_info = {
                 "clust_name": clust_name,
                 "og": og["#OG_name"],       # OG name
@@ -163,8 +172,8 @@ class OGPreprocessor:
                 "ld": og["Lca_Dup"],        # LCA duplication
                 "so": og["Species_Outliers"],  # Species outliers
                 "nso": int(og["Num_SP_Outliers"]),  # Number of species outliers
-                "ir": float(og["Inparalogs_Rate"]),  # Inparalogs rate
-                "so_dup": float(og["SP_overlap_dup"]),  # Species overlap duplication
+                "ir": in_rate,  # Inparalogs rate
+                "so_dup": so_ovlap,  # Species overlap duplication
                 "seqs": [],                 # Sequences with annotations
                 "rec_seqs": og["RecoverySeqs"],  # Recovery sequences
                 "top_kegg": kegg_top_terms,
@@ -241,9 +250,9 @@ class OGPreprocessor:
 
 if __name__ == "__main__":
     # Paths
-    seq_annotation_dir = "/data/projects/Egg7_data/raw_annotations"  # Directory containing annotation files
-    ogs_file = os.path.join("/data/projects/Egg7_data/raw_results", "OGs.tsv")  # Path to OGs file
-    output_file = "/data/projects/Egg7_data/process_results/output_ogs_with_annotations.jsonl"  # Output file
+    seq_annotation_dir = "/home/huerta/build_eggnog/seqs_annotations"  # Directory containing annotation files
+    ogs_file = os.path.join("/home/plaza/projects/Egg7_data/", "test.tsv")  # Path to OGs file
+    output_file = "/home/plaza/projects/Egg7_data/test_ogs_with_annotations.jsonl"  # Output file
 
     # Preprocessor
     preprocessor = OGPreprocessor(seq_annotation_dir, ogs_file, output_file)
