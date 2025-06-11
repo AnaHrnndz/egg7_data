@@ -20,27 +20,27 @@ class OGPreprocessor:
         """
         print("Loading sequence annotations...")
         annotation_files = [
-            "e6.seq2best_description.tsv",
-            "e6.seq2bestname.tsv",
-            "e6.seq2bigg.tsv",
-            "e6.seq2card.tsv",
-            "e6.seq2cazy.tsv",
-            "e6.seq2go.tsv",
-            "e6.seq2goslim.tsv",
-            "e6.seq2kegg.tsv",
-            "e6.seq2pdb.tsv",
-        #    "e6.seq2pfam.tsv",
-            "e6.seq2pfam.no_clans_overlap.tsv",
-            "e6.seq2smart.tsv",
+            "e6-seq2best_description.tsv",
+            "e6-seq2bestname.tsv",
+            "e6-seq2bigg.tsv",
+            "e6.5-seq2card.tsv",
+            "e6-seq2cazy.tsv",
+        #    "e6.seq2go.tsv",
+            "e6-seq2goslim.tsv",
+            "e6.5-seq2kegg.tsv",
+            "e6.5-seqs2pdb.tsv",
+            "e6.5-seq2pfam_info.tsv",
+            "e6-seq2smart.tsv",
         ]
 
         for filename in annotation_files:
             file_path = os.path.join(self.seq_annotation_dir, filename)
-            key = filename.split(".")[1].split('2')[1] 
+            key = filename.split("2")[1].replace('.tsv', '')
             print(key)
             
             if key == 'kegg':
-                kegg_annotations = ['knumber', 'reaction', 'pathway', 'module', 'enzyme', 'gsymbol', 'gname', 'desc']
+                #kegg_annotations = ['knumber', 'reaction', 'pathway', 'module', 'enzyme', 'gsymbol', 'gname', 'desc']
+                kegg_annotations = ['knumber', 'pathway', 'module', 'enzyme', 'brite', 'gsymbol', 'gname']
 
                 for k in kegg_annotations:
                     self.annotations[k] = defaultdict(list)
@@ -67,9 +67,9 @@ class OGPreprocessor:
                 self.annotations[key] = defaultdict(list)
                 self.annotations = parser_cazy(file_path, self.annotations)
 
-            elif key == 'go':
-                self.annotations[key] = defaultdict(list)
-                self.annotations = parser_go(file_path, self.annotations)
+            # elif key == 'go':
+                # self.annotations[key] = defaultdict(list)
+                # self.annotations = parser_go(file_path, self.annotations)
 
             elif key == 'goslim':
                 self.annotations[key] = defaultdict(list)
@@ -79,7 +79,7 @@ class OGPreprocessor:
                 self.annotations[key] = defaultdict(list)
                 self.annotations = parser_pdb(file_path, self.annotations)
 
-            elif key == 'pfam':
+            elif key == 'pfam_info':
                 self.annotations['pfam'] = defaultdict(list)
                 self.annotations['pfam_arc'] = defaultdict(list)
                 self.annotations = parser_pfam(file_path, self.annotations)
@@ -99,6 +99,8 @@ class OGPreprocessor:
                         values = parts[1:]
                         self.annotations[key][seq_id].extend(values)
 
+        print(self.annotations.keys())
+    
         print("Annotations loaded.")
 
 
@@ -113,6 +115,7 @@ class OGPreprocessor:
             for line in file:
                 if line.startswith("#"):
                     headers = line.strip().split("\t")
+                    print(headers)
                     continue
                 parts = line.strip().split("\t")
                 og_entry = dict(zip(headers, parts))
@@ -121,6 +124,25 @@ class OGPreprocessor:
                 self.ogs_data.append(og_entry)
         print("OGs data loaded.")
 
+    def clean_dict(self, diccionario):
+        """
+        Elimina las claves cuyo valor esté vacío: None, '', [], {}, set()
+        """
+        
+        clean_dict = defaultdict(dict)
+
+        for k, val in diccionario.items():
+            if k == 'fprof_sum' and isinstance(val, dict):
+                clean_dict[k] = {f: v for f, v in val.items() if v}
+
+            else:
+                clean_dict[k] = val
+
+        return clean_dict
+
+
+
+        #return {k: v for k, v in diccionario['fprof_sum'].items() if v not in (None, '', [], {}, set())}
 
 
     def cross_link_information(self):
@@ -131,22 +153,29 @@ class OGPreprocessor:
         ogs_with_annotations = []
 
         for og in self.ogs_data:
-            seq_ids = og["Seqs"]
             
+            seq_ids = og["Seqs"]
+        
+            spcies = set(s.split('.')[0] for s in seq_ids)
+                
             clust_name = og["#OG_name"].split('@')[0]
 
             # Calculate top terms
             kegg_top_terms = self.calculate_top_terms(seq_ids, "knumber")
-            go_top_terms = self.calculate_top_terms(seq_ids, "go")
+            kpathway_top_terms = self.calculate_top_terms(seq_ids, "pathway")
+            kmodule_top_terms = self.calculate_top_terms(seq_ids, "module")
+            kgsymbol_top_terms = self.calculate_top_terms(seq_ids, "gsymbol")
+            kgname_top_terms = self.calculate_top_terms(seq_ids, "gname")
             best_name_top_term = self.calculate_top_terms(seq_ids, "bestname")
             bigg_top_term = self.calculate_top_terms(seq_ids, "bigg")
             cazy_top_term = self.calculate_top_terms(seq_ids, "cazy")
             card_top_term = self.calculate_top_terms(seq_ids, "card")
-            go_top_term = self.calculate_top_terms(seq_ids, "go")
+            #go_top_terms = self.calculate_top_terms(seq_ids, "go")
             goslim_top_term = self.calculate_top_terms(seq_ids, "goslim")
             pdb_top_term = self.calculate_top_terms(seq_ids, "pdb")
             pfam_top_term = self.calculate_top_terms(seq_ids, "pfam_arc")
             smart_top_term = self.calculate_top_terms(seq_ids, "smart_arc")
+
   
             if og["Inparalogs_Rate"] == '-':
                 in_rate = '-'
@@ -158,43 +187,73 @@ class OGPreprocessor:
             else:
                 so_ovlap = float(og["SP_overlap_dup"])
 
+            if og["OG_down"] == '-':
+                nogdown = 0
+            else:
+                nogdown = len(og["OG_down"].split(','))
+
+            if og["OG_up"] == '-':
+                nogup = 0
+            else:
+                nogup = len(og["OG_up"].split(','))
+
             og_info = {
                 "clust_name": clust_name,
-                "og": og["#OG_name"],       # OG name
-                "tl": og["TaxoLevel"],      # Taxonomic level
+                "n": og["#OG_name"],       # OG name
+                "l": og["TaxoLevel"],      # Taxonomic level
                 "sn": og["SciName_TaxoLevel"],  # Scientific name
                 "an": og["AssocNode"],      # Associated node
-                "sp": int(og["NumSP"]),     # Number of species
-                "od": og["OG_down"],        # OG down
-                "ou": og["OG_up"],          # OG up
-                "nseq": int(og["NumSeqs"]), # Number of sequences
+                "ns": int(og["NumSP"]),     # Number of species
+                "ch": og["OG_down"],        # OG down
+                "par": og["OG_up"],          # OG up
+                "npar": nogup,
+                "nch": nogdown,
+                "nm": int(og["NumSeqs"]), # Number of sequences
                 "nrec": int(og["NumRecoverySeqs"]),  # Number of recovery sequences
                 "ld": og["Lca_Dup"],        # LCA duplication
                 "so": og["Species_Outliers"],  # Species outliers
                 "nso": int(og["Num_SP_Outliers"]),  # Number of species outliers
                 "ir": in_rate,  # Inparalogs rate
                 "so_dup": so_ovlap,  # Species overlap duplication
-                "seqs": [],                 # Sequences with annotations
+                "seqs": seq_ids,       #list with annotations that will be added later         
+                "spcs": list(spcies), 
                 "rec_seqs": og["RecoverySeqs"],  # Recovery sequences
-                "top_kegg": kegg_top_terms,
-                "top_go" : go_top_terms,
-                "top_best_name" : best_name_top_term,
-                "top_bigg" : bigg_top_term,
-                "top_cazy" : cazy_top_term,
-                "top_card" : card_top_term,
-                "top_go" : go_top_term,
-                "top_goslim" : goslim_top_term,
-                "top_pdb" : pdb_top_term,
-                "top_pfam" : pfam_top_term,
-                "top_smart" : smart_top_term
+                "fprof_sum": {
+                    "kegg_ko": kegg_top_terms,
+                    "kegg_pathway": kpathway_top_terms,
+                    "kegg_module": kmodule_top_terms,
+                    "kegg_gsymbol": kgsymbol_top_terms,
+                    "kegg_gname": kgname_top_terms,
+                    #"go" : go_top_terms,
+                    "best_name" : best_name_top_term,
+                    "bigg" : bigg_top_term,
+                    "cazy" : cazy_top_term,
+                    "card" : card_top_term,
+                    "GOslim" : goslim_top_term,
+                    "pdb" : pdb_top_term,
+                    "pfam_arch" : pfam_top_term,
+                    "smart_arch" : smart_top_term
+                }
             }
 
-            for seq_id in og["Seqs"]:
-                seq_annotations = {key: self.annotations[key].get(seq_id, []) for key in self.annotations}
-                seq_info = {"id": seq_id, "ann": seq_annotations}
-                og_info["seqs"].append(seq_info)
+            # for sid in seq_ids:
+                # seq_annotations = {key: self.annotations[key].get(sid, []) for key in self.annotations.keys()}
+                # seq_info = {"id": sid, "ann": seq_annotations}
+                # og_info["seqs"].append(seq_info)
+            
+            # for sid in seq_ids:
+                # seq_annotations = {}
+                # for key in self.annotations:
+                    # annot = self.annotations[key].get(sid, [])
+                    # if annot:
+                        # seq_annotations[key] = annot
+                
+                # seq_info = {"id": sid, "ann": seq_annotations}
+                # og_info["seqs"].append(seq_info)
 
-            ogs_with_annotations.append(og_info)
+
+            clean_og_info = self.clean_dict(og_info)
+            ogs_with_annotations.append(clean_og_info)
 
         print("Cross-linking complete.")
         return ogs_with_annotations
@@ -226,8 +285,9 @@ class OGPreprocessor:
 
     def calculate_top_terms(self, seq_ids, annotation_type):
         if annotation_type not in self.annotations:
+
             print(f"Warning: Annotation type '{annotation_type}' not found.")
-            return []
+            return list()
 
         term_counter = Counter()
         for seq_id in seq_ids:
@@ -236,9 +296,9 @@ class OGPreprocessor:
         del term_counter[None]
         total = len(seq_ids)
         if total == 0:
-            return []
+            return list()
 
-        top_terms = []
+        top_terms = list()
         
         for term, count in term_counter.most_common(3):
             percentage = (count / total) * 100
@@ -250,9 +310,9 @@ class OGPreprocessor:
 
 if __name__ == "__main__":
     # Paths
-    seq_annotation_dir = "/home/huerta/build_eggnog/seqs_annotations"  # Directory containing annotation files
-    ogs_file = os.path.join("/home/plaza/projects/Egg7_data/", "test.tsv")  # Path to OGs file
-    output_file = "/home/plaza/projects/Egg7_data/test_ogs_with_annotations.jsonl"  # Output file
+    seq_annotation_dir = "/home/plaza/projects/eggnog6.5/analysis/seq_annotations"  # Directory containing annotation files
+    ogs_file = os.path.join("/home/plaza/projects/eggnog6.5/analysis/og_delineation/", "e6.5-ogs_combined.tsv")  # Path to OGs file
+    output_file = "/home/plaza/projects/eggnog6.5/analysis/ogs_func_annot/e6.5-fannot_ogs.jsonl"  # Output file
 
     # Preprocessor
     preprocessor = OGPreprocessor(seq_annotation_dir, ogs_file, output_file)

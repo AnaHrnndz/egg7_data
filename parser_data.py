@@ -14,36 +14,44 @@ def parser_kegg(file_path, annotations):
     with open(file_path, "r") as file:
         for line in file:
         
-            (seqid, knumber, gsymbol, gname, brite, cazy, cog, disease, drug, enzyme, go, 
-                module, network, pathway, pubmed, rclass, reaction, tc, desc) = map(str.strip, line.rstrip('\n').split('\t'))
+            #(seqid, knumber, gsymbol, gname, brite, cazy, cog, disease, drug, enzyme, go, 
+            #    module, network, pathway, pubmed, rclass, reaction, tc, desc) = map(str.strip, line.rstrip('\n').split('\t'))
+
+
+    
+            
+            (seqid, kegg_seq, knumber, pathway, lgsymbol, lgname, lbrite, lenzyme, lmodule) = map(str.strip, line.rstrip('\n').split('\t'))
     
             if clean(knumber):
                 annotations['knumber'][seqid] = list(parse_list(knumber, ','))   
                 #seq2knumber[seqid] = frozenset(parse_list(knumber, ','))    
     
-            if clean(reaction):
-                annotations['reaction'][seqid] =list(parse_list(reaction, ','))    
+            # if clean(reaction):
+                # annotations['reaction'][seqid] =list(parse_list(reaction, ','))    
             
             if clean(pathway):
                 annotations['pathway'][seqid] = list(parse_list(pathway, ','))
     
-            if clean(module): 
-                annotations['module'][seqid] = list(parse_list(module, ','))
+            if clean(lmodule): 
+                annotations['module'][seqid] = list(parse_list(lmodule, ','))
     
-            if clean(enzyme):
-                annotations['enzyme'][seqid] =  list(parse_list(enzyme, ','))
+            if clean(lenzyme):
+                annotations['enzyme'][seqid] =  list(parse_list(lenzyme, ','))
+
+            if clean(lbrite): 
+                annotations['brite'][seqid] = list(parse_list(lbrite, ','))
     
-            if clean(gsymbol):        
+            if clean(lgsymbol):        
                 gsymbol_set = set()
-                for element in parse_list(gsymbol, '|'):
+                for element in parse_list(lgsymbol, ','):
                     gsymbol_set.update(parse_list(element, ','))    
                 annotations['gsymbol'][seqid] = list(gsymbol_set)
     
-            if clean(gname): 
-                annotations['gname'][seqid] = list(parse_list(gname, '|'))
+            if clean(lgname): 
+                annotations['gname'][seqid] = list(parse_list(lgname, ','))
     
-            if clean(desc): 
-                annotations['desc'][seqid] = list(parse_list(desc, '|'))
+            # if clean(desc): 
+                # annotations['desc'][seqid] = list(parse_list(desc, '|'))
 
     
     return annotations
@@ -88,7 +96,8 @@ def parser_card(file_path, annotations):
     with open(file_path, "r") as file:
         for line in file:
     
-            seqid, cardname, card_prot, card_ar, card_species = map(str.strip, line.split('\t'))
+            #seqid, cardname, card_prot, card_ar, card_species = map(str.strip, line.split('\t'))
+            seqid, cardname = map(str.strip, line.split('\t'))
             if clean(cardname): 
                 annotations['card'][seqid] = cardname.split(',')
     
@@ -152,8 +161,11 @@ def parser_pfam(file_path, annotations):
 
             pfam_array = []
             for pfam in pfam_string.split(','):
-                pfam_name, start, end = pfam.split('|')
-                pfam_name = pfam_name.strip()
+                #pfam_name, start, end = pfam.split('_')
+                pfaminfo = pfam.split('_')
+                pfam_name = '_'.join(pfaminfo[:-2])
+                start = pfaminfo[-2]
+                end = pfaminfo[-1]
                 start = int(start)
                 end = int(end)
                 pfam_array.append([pfam_name, start, end])
